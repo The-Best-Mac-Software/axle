@@ -15,43 +15,42 @@ void board_clear() {
 }
 
 void move_up(game_state_t* game_state) {
-	int new_head_x = game_state->last_head_x;
-	int new_head_y = game_state->last_head_y - 1;
+	snake_player_t* player = game_state->player;
 
-	game_state->last_head_x = new_head_x;
-	game_state->last_head_y = new_head_y;
-
-	terminal_putentryat("@", 66, new_head_x, new_head_y);
+	for (int i = 0; i < player->length; i++) {
+		player->body[i].y = player->body[i].y - 1;
+		terminal_putentryat("@", 66, player->body[i].x, player->body[i].y);
+	}
 }
 
 void move_down(game_state_t* game_state) {
-	int new_head_x = game_state->last_head_x;
-	int new_head_y = game_state->last_head_y + 1;
+	snake_player_t* player = game_state->player;
 
-	game_state->last_head_x = new_head_x;
-	game_state->last_head_y = new_head_y;
-
-	terminal_putentryat("@", 66, new_head_x, new_head_y);
+	for (int i = 0; i < player->length; i++) {
+		player->body[i].y = player->body[i].y + 1;
+		terminal_putentryat("@", 66, player->body[i].x, player->body[i].y);
+	}
 }
 
 void move_left(game_state_t* game_state) {
-	int new_head_x = game_state->last_head_x - 1;
-	int new_head_y = game_state->last_head_y;
+	snake_player_t* player = game_state->player;
 
-	game_state->last_head_x = new_head_x;
-	game_state->last_head_y = new_head_y;
-
-	terminal_putentryat("@", 66, new_head_x, new_head_y);
+	for (int i = 0; i < player->length; i++) {
+		player->body[i].x = player->body[i].x - 1;
+		terminal_putentryat("@", 66, player->body[i].x, player->body[i].y);
+	}
 }
 
 void move_right(game_state_t* game_state) {
-	int new_head_x = game_state->last_head_x + 1;
-	int new_head_y = game_state->last_head_y;
+	printf_info("Moving right");
 
-	game_state->last_head_x = new_head_x;
-	game_state->last_head_y = new_head_y;
+	snake_player_t* player = game_state->player;
 
-	terminal_putentryat("@", 66, new_head_x, new_head_y);
+	//for (int i = 0; i < player->length; i++) {
+	//	printf_info("Drawing next block %d", i);
+		player->head->x = player->head->x + 1;
+		terminal_putentryat("@", 66, player->head->x, player->head->y);
+	//}
 }
 
 void move_dispatch(game_state_t* game_state) {
@@ -84,8 +83,7 @@ void game_tick(game_state_t* game_state) {
 
 		move_dispatch(game_state);
 
-		sleep(100);
-
+		sleep(100); 
 		if (haskey()) {
 			char ch = getchar();
 			if (ch == 'w' || ch == 'a' || ch == 's' || ch == 'd') {
@@ -101,18 +99,33 @@ void game_tick(game_state_t* game_state) {
 	}
 }
 
-void play_snake() {
-	terminal_clear();
-
-	//while quit game character is not matched
-	char ch;
-
+game_state_t* game_setup() {
 	game_state_t* game_state = kmalloc(sizeof(game_state_t));
 	snake_player_t* player = kmalloc(sizeof(snake_player_t));
 	game_state->player->is_alive = 1;
 	game_state->last_move = 'd';
-	player->length = 10;
+	player->length = 1;
+	player->head = kmalloc(sizeof(*player->head));
+	player->head->x = 10;
+	player->head->y = 10;
+	player->head->direction = 3;
+	player->body = kmalloc(sizeof(*player->body) * 256);
+	player->body[0] = *player->head;
+
+	return game_state;
+}
+
+void game_teardown(game_state_t* game_state) {
+	//free(game_state->player);
+	//free(game_state);
 	
+	printf_info("Thanks for playing!");
+}
+
+void play_snake() {
+	terminal_clear();
+
+	game_state_t* game_state = game_setup();	
 	board_clear();
 
 	//ensure game_tick runs at least once
@@ -120,5 +133,5 @@ void play_snake() {
 		game_tick(game_state);
 	} while (game_state->is_running != 0);
 	
-	printf_info("Thanks for playing!");
+	game_teardown(game_state);
 }
