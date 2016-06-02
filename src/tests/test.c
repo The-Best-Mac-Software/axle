@@ -44,6 +44,8 @@ void test_heap() {
 	uint32_t c = kmalloc(12);
 	printf_dbg("c: %x", c);
 	kfree(c);
+	c = kmalloc(12);
+	printf_dbg("c now: %x", c);
 
 	if (a == c) {
 		printf_info("Heap test passed");

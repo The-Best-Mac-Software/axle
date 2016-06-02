@@ -63,6 +63,7 @@ void kfree(void* p) {
 static int32_t find_smallest_hole(uint32_t size, uint8_t align, heap_t* heap) {
 	//find smallest hole that will fit
 	uint32_t iterator = 0;
+	printf_info("heap size: %d", heap->index.size);
 	while (iterator < heap->index.size) {
 		header_t* header = (header_t*)array_o_lookup(iterator, &heap->index);
 
@@ -70,13 +71,12 @@ static int32_t find_smallest_hole(uint32_t size, uint8_t align, heap_t* heap) {
 		ASSERT(header->magic == HEAP_MAGIC, "invalid header magic");
 
 		//if user has requested memory be page aligned
-		//
 		if (align > 0) {
 			//page align starting point of header
 			uint32_t location = (uint32_t)header;
 			int32_t offset = 0;
 			if ((location + sizeof(header_t) & 0xFFFFF000) != 0) {
-				offset = PAGE_SIZE - ((location + sizeof(header_t)) % PAGE_SIZE);
+				offset = PAGE_SIZE - (location + sizeof(header_t)) % PAGE_SIZE;
 			}
 			
 			int32_t hole_size = (int32_t)header->size - offset;
@@ -154,7 +154,7 @@ void expand(uint32_t new_size, heap_t* heap) {
 	uint32_t old_size = heap->end_address - heap->start_address;
 	uint32_t i = old_size;
 	while (i < new_size) {
-		alloc_frame(get_page(heap->start_address + i, 1, current_directory == 0 ? kernel_directory : current_directory), (heap->supervisor) ? 1 : 0, (heap->readonly) ? 0 : 1);
+		alloc_frame(get_page(heap->start_address + i, 1, kernel_directory), (heap->supervisor) ? 1 : 0, (heap->readonly) ? 0 : 1);
 		i += PAGE_SIZE;
 	}
 	heap->end_address = heap->start_address + new_size;
@@ -176,7 +176,7 @@ static uint32_t contract(uint32_t new_size, heap_t* heap) {
 	uint32_t old_size = heap->end_address - heap->start_address;
 	uint32_t i = old_size - PAGE_SIZE;
 	while (new_size < i) {
-		free_frame(get_page(heap->start_address + i, 0, current_directory == 0 ? kernel_directory : current_directory));
+		free_frame(get_page(heap->start_address + i, 0, kernel_directory));
 		i -= PAGE_SIZE;
 	}
 	heap->end_address = heap->start_address + new_size;
@@ -184,10 +184,13 @@ static uint32_t contract(uint32_t new_size, heap_t* heap) {
 }
 
 void* alloc(uint32_t size, uint8_t align, heap_t* heap) {
+	kernel_begin_critical();
+
 	//make sure we take size of header/footer into account
 	uint32_t new_size = size + sizeof(header_t) + sizeof(footer_t);
 	//find smallest hole that will fit
 	int32_t iterator = find_smallest_hole(new_size, align, heap);
+	printf_info("smallest hole: %d", iterator);
 
 	if (iterator == -1) {
 		//no free hole large enough was found
@@ -259,6 +262,8 @@ void* alloc(uint32_t size, uint8_t align, heap_t* heap) {
 	//make a new hole in front of our block
 	if (align && orig_hole_pos & 0xFFFFF000) {
 		uint32_t new_location = orig_hole_pos + PAGE_SIZE - (orig_hole_pos & 0xFFF) - sizeof(header_t);
+		printf_info("orig_hole_pos: %x", orig_hole_pos);
+		printf_info("new_location: %x", new_location);
 		header_t* hole_header = (header_t*)orig_hole_pos;
 		hole_header->size = PAGE_SIZE - (orig_hole_pos & 0xFFF) - sizeof(header_t);
 		hole_header->magic = HEAP_MAGIC;
@@ -303,12 +308,16 @@ void* alloc(uint32_t size, uint8_t align, heap_t* heap) {
 		array_o_insert((void*)hole_header, &heap->index);
 	}
 
+	kernel_end_critical();
+
 	return (void*)((uint32_t)block_header + sizeof(header_t));
 }
 
 void free(void* p, heap_t* heap) {
 	if (p == 0) return;
 
+	printf_info("Freeing %x", p);
+	
 	//get header and footer associated with this pointer
 	header_t* header = (header_t*)((uint32_t)p - sizeof(header_t));
 	footer_t* footer = (footer_t*)((uint32_t)header + header->size - sizeof(footer_t));
@@ -327,6 +336,7 @@ void free(void* p, heap_t* heap) {
 	//if thing to left of us is a footer...
 	footer_t* test_footer = (footer_t*)((uint32_t)header - sizeof(footer_t));
 	if (test_footer->magic == HEAP_MAGIC && test_footer->header->hole == 1) {
+		printf_info("Merging left");
 		uint32_t cache_size = header->size; //cache current size
 		header = test_footer->header; //rewrite header with new one
 		footer->header = header; //rewrite footer to point to new header
@@ -338,6 +348,7 @@ void free(void* p, heap_t* heap) {
 	//if thing to right of us is a header...
 	header_t* test_header = (header_t*)((uint32_t)footer + sizeof(footer_t));
 	if (test_header->magic == HEAP_MAGIC && test_header->hole == 1) {
+		printf_info("Merging right");
 		header->size += test_header->size; //increase size to fit merged hole
 		test_footer = (footer_t*)((uint32_t)test_header + test_header->size - sizeof(footer_t)); //rewrite its footer to point to our header
 		footer = test_footer;
@@ -351,25 +362,14 @@ void free(void* p, heap_t* heap) {
 		//ensure we actually found the item
 		ASSERT(iterator < heap->index.size, "couldn't find item!");
 
-		//header is fake, delete it and process as if there was nothing
-		if (iterator > heap->index.size) {
-			//delete fake header
-			test_header->magic = 0;
-			test_header->hole = 1;
-		}
-		else {
-			//everything was normal
-			//increase size
-			header->size += test_header->size;
-			test_footer = (footer_t*)((uint32_t)test_header + test_header->size - sizeof(footer_t));
-			footer = test_footer;
-			//remove it
-			array_o_remove(iterator, &heap->index);
-		}
+		printf_info("Removing header from array from merge right");
+		//remove it
+		array_o_remove(iterator, &heap->index);
 	}
 
 	//if footer location is the end address, we can contract
 	if ((uint32_t)footer + sizeof(footer_t) == heap->end_address) {
+		printf_info("Freed value at end of heap...contracting");
 		uint32_t old_length = heap->end_address - heap->start_address;
 		uint32_t new_length = contract((uint32_t)header - heap->start_address, heap);
 		//check how big we'll be after resizing
@@ -390,12 +390,14 @@ void free(void* p, heap_t* heap) {
 
 			//if we didn't find ourselves, we have nothing to remove
 			if (iterator < heap->index.size) {
+				printf_info("Removing ourselves from array");
 				array_o_remove(iterator, &heap->index);
 			}
 		}
 	}
 
 	if (add = 1) {
+		printf_info("Inserting header into array");
 		array_o_insert((void*)header, &heap->index);
 	}
 }

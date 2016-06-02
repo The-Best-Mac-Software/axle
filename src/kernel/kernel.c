@@ -121,7 +121,6 @@ void kernel_main(multiboot* mboot_ptr, uint32_t initial_stack) {
 	paging_install();
 
 	syscall_install();
-
 	tasking_install();
 	
 	kb_install();
@@ -133,6 +132,64 @@ void kernel_main(multiboot* mboot_ptr, uint32_t initial_stack) {
 
 	//force_page_fault();
 	//force_hardware_irq();	
+/*
+	static int ret = 6;
+	static int a_count = 0;
+	static int b_count = 0;
+	for (int i = PRIO_LOW; i <= PRIO_HIGH; i++) {
+		ret = fork(i);
+
+		printf_info("using prio %d", i);
+
+		a_count = 0;
+		b_count = 0;
+		while (1) {
+			if (b_count > 50) {
+				if (!ret) {
+					printf_info("Process [%d] got %d/%d quantums", getpid(), b_count, (a_count + b_count));
+					break;
+				}
+				else continue;
+			}
+			else {
+				if (!ret) b_count++;
+				a_count++;
+				//yield();
+			}
+		}
+	}
+*/
+/*
+	for (int i = PRIO_LOW; i < PRIO_MED; i++) {
+		switch (i) {
+			case PRIO_LOW:
+			default:
+				printf_info("PRIO_LOW");
+				break;
+			case PRIO_MED:
+				printf_info("PRIO_MED");
+				break;
+			case PRIO_HIGH:
+				printf_info("PRIO_HIGH");
+				break;
+		}
+
+		int ret = fork(i);
+		static int a_count = 0;
+		static int b_count = 0;
+		while (1) {
+			if (a_count > 1000 || b_count > 1000) break;
+			if (ret) a_count++;
+			else b_count++;
+			yield();
+			//if (!ret) printf_info("child");
+			//else printf_info("parent");
+		}
+
+		if (!ret) printf_info("a_count: %d b_count %d", a_count, b_count);
+	}
+*/
+	while (1) {}
 
 	shell_init();
 	shell_loop();
