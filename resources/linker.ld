@@ -7,17 +7,11 @@ ENTRY(start)
     final kernel image
 */
 SECTIONS {
-    /*  begin putting sections at 1Mib, a conventional place for
-        kernels to be loaded at by the bootloader
-    */
-    . = 1M;
-
     /*  first put the multiboot header, as it's required to be put very early in the
         image or the bootloader won't recognize the file format
         then we'll put the .text section
     */
-    .text ALIGN(4K) : {
-        *(.multiboot)
+    .text 0x100000: {
 		code = .; _code = .; __code = .;
 		*(.mboot)
 		*(.text)
@@ -43,10 +37,8 @@ SECTIONS {
     */
     .bss : {
 		bss = .; _bss = .; __bss = .;
-        *(COMMON)
         *(.bss)
-        *(.bootstrap_stack)
-	. = ALIGN(4096);
+		. = ALIGN(4096);
     }
 
     end = .; _end = .; __end = .;

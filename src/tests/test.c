@@ -4,6 +4,8 @@
 #include <kernel/drivers/vesa/vesa.h>
 #include <kernel/drivers/rtc/clock.h>
 #include <crypto/crypto.h>
+#include <kernel/util/pmm/pmm.h>
+#include <kernel/util/vmm/vmm.h>
 
 void test_colors() {
 	printf_info("Testing colors...");
@@ -39,40 +41,43 @@ void test_interrupts() {
 
 void test_heap() {
 	printf_info("Testing heap...");
-
-	uint32_t* a = (uint32_t*)kmalloc(8);
-	uint32_t* b = (uint32_t*)kmalloc(8);
-	printf_dbg("a: %x, b: %x", a, b);
+	void* a = kmalloc(8);
+	void* b = kmalloc(8);
+	void* c = kmalloc(8);
 	kfree(a);
 	kfree(b);
-
-	uint32_t* c = (uint32_t*)kmalloc(12);
-	printf_dbg("c: %x", c);
+	void* d = kmalloc(24);
 	kfree(c);
-
-	if (a == c) {
-		printf_info("Heap test passed");
-	}
-	else printf_err("Heap test failed, expected %x to be marked free", a);
+	kfree(d);
+	printf("a: %x, b: %x, c: %x, d: %x\n", a, b, c, d);
 }
 
-void test_malloc() {
-	printf_info("Testing malloc...");
+void test_vmm() {
+	uint32_t page = pmm_alloc_page();
+	uint32_t* ptr = (uint32_t*)page;
+	//identity map this page (map virt addr directly to phys addr)
+	//this is so we can access the page transparently, with its real physical address
+	vmm_map(page, page, PAGE_PRESENT | PAGE_WRITE);
 
-	//Check used memory before malloc test
-	//if more mem is used after test, then the test failed
-	uint32_t used = used_mem();
+	uint32_t magic = 0xDEADBEEF;
+	//set the first word of this page
+	//note! this is setting using the _virtual_ address, which is mapped to the same physical address
+	//so if we read this word back and get the correct info, then the virtual memory manager (paging) is doing what it's supposed to
+	*ptr = magic;
+	uint32_t word = *((uint32_t*)page);
+	ASSERT(word == magic, "%x did not match expected value at page %x", word, magic);
 
-	for (int i = 0; i < 32; i++) {
-		uint32_t* tmp = (uint32_t*)kmalloc(0x1000);
-		kfree(tmp);
-	}
+	//double checked it was identity mapped correctly
+	uint32_t phys;
+	vmm_get_mapping(page, &phys);
+	ASSERT(page == phys, "Identity map failed: %x->%x", page, phys);
 
-	if (used != used_mem()) {
-		printf_err("Malloc test failed. Expected %x bytes in use, had %x", used, used_mem());
-		return;
-	}
-	printf_info("Malloc test passed");
+	//test done
+	//unmap this page from VMM and PMM
+	vmm_unmap(page);
+	pmm_free_page(page);
+
+	printf_info("VMM test passed");
 }
 
 void test_printf() {
@@ -103,4 +108,14 @@ void test_crypto() {
 	printf_info("SHA256 test %s", sha256_test() ? "passed":"failed");
 	printf_info("Testing AES...");
 	printf_info("AES test %s", aes_test() ? "passed":"failed");
+}
+
+void test_standard() {
+	test_colors();
+	test_interrupts();
+	test_printf();
+	test_time_unique();
+	test_vmm();
+	test_heap();
+	test_crypto();
 }

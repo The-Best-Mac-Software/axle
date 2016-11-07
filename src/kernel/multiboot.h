@@ -1,3 +1,6 @@
+#ifndef MULTIBOOT_H
+#define MULTIBOOT_H
+
 #include <std/common.h>
 
 #define MULTIBOOT_FLAG_MEM	0x001
@@ -37,6 +40,15 @@ typedef struct multiboot_info {
 	uint32_t vbe_interface_seg;
 	uint32_t vbe_interface_off;
 	uint32_t vbe_interface_len;
-} multiboot; 
+} __attribute__((packed)) multiboot;
 
-//typedef struct multiboot_header multiboot_header_t;
+typedef struct {
+  uint32_t size;
+  uint32_t base_addr_low;
+  uint32_t base_addr_high;
+  uint32_t length_low;
+  uint32_t length_high;
+  uint32_t type;
+} __attribute__((packed)) mmap_entry_t;
+
+#endif
