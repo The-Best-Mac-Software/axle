@@ -49,3 +49,25 @@ void pmm_free_page(uint32_t page) {
 		pmm_stack_loc += sizeof(uint32_t);
 	}
 }
+
+void pmm_map_ram(multiboot* mboot_ptr) {
+	//find usable areas of memory and inform physical mem manager about them
+	uint32_t i = mboot_ptr->mmap_addr;
+	while (i < mboot_ptr->mmap_addr + mboot_ptr->mmap_length) {
+		mmap_entry_t* me = (mmap_entry_t*)i;
+
+		//is this usable RAM?
+		if (me->type == 1) {
+			//for every page in entry, add to free page stack
+			for (uint32_t j = me->base_addr_low; j < me->base_addr_low + me->length_low; j += PAGE_SIZE) {
+				pmm_free_page(j);
+			}
+			printf_info("pmm mapped %x to %x", me->base_addr_low, me->base_addr_low + me->length_low);
+		}
+
+		//multiboot spec quirk
+		//size member doesn't include its own size in calculations,
+		//so we have to add sizeof ourselves
+		i += me->size + sizeof(uint32_t);
+	}
+}
