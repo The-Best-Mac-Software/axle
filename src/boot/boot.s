@@ -7,41 +7,28 @@ MBOOT_CHECKSUM		equ -(MBOOT_HEADER_MAGIC + MBOOT_HEADER_FLAGS)
 [BITS 32]
 
 [GLOBAL mboot]
-[EXTERN code]			; start of .text section
-[EXTERN bss]			; start of .bss
-[EXTERN end]			; end of last loadable section
-
 [SECTION .mboot]
 mboot:
 	dd MBOOT_HEADER_MAGIC	; header value for GRUB
 	dd MBOOT_HEADER_FLAGS	; grub settings
 	dd MBOOT_CHECKSUM	; ensure above values are correct
 
-	dd mboot		; location of this descriptor
-	dd code			; start of .text (code) section
-	dd bss			; start of .data section
-	dd end			; end of kernel
-	dd start		; kernel entry point (initial EIP)
-
 [SECTION .text]
 [GLOBAL start]			; entry point
 [EXTERN kernel_main]		; C entry point
 start:
 	; load multiboot information
-	mov esp, stack_space
-	push esp
 	push ebx
+	mov ebp, 0
 
 	; execute kernel
-	call kernel_main
 	cli
+	call kernel_main
 	hlt
 	jmp $			; enter infinite loop so processor doesn't
 				; try executing junk values in memory
+.end:
+
 
 ; set size of the _start symbol to the current location '.' minus its start
 ; .size _start, . -_start
-
-[SECTION .bss]
-RESB 8192 ; reserve 8kb stack
-stack_space:

@@ -57,7 +57,8 @@ void paging_install() {
 	//or else it'll just panic on the first pmm_free_page() 
 	uint32_t pt_idx = PAGE_DIR_IDX((PMM_STACK_ADDR >> 12));
 	page_directory[pt_idx] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
-	memset(page_tables[pt_idx * 1024], 0, PAGE_SIZE);
+	printf("memset pt %x %x\n", pt_idx, page_tables[pt_idx * 1024]);
+	memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
 
 	//paging is active!
 	//let physical mem manager know
@@ -81,7 +82,8 @@ void vmm_map(uint32_t virt, uint32_t page, uint32_t flags) {
 	if (!page_directory[pt_idx]) {
 		//page table holding this page hasn't been created yet!
 		page_directory[pt_idx] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
-		memset(page_tables[pt_idx * 1024], 0, PAGE_SIZE);
+		printf("memset try pt %x %x\n", pt_idx, page_tables[pt_idx * 1024]);
+		//memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
 	}
 
 	//page table exists, update PTE

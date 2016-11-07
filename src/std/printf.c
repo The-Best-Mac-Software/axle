@@ -199,15 +199,15 @@ char* vsprintf(char* format, va_list va) {
 void printf(char* format, ...) {
 	//shared printf lock
 	static lock_t* mutex = 0;
-	if (!mutex) mutex = lock_create();
-	lock(mutex);
+	//if (!mutex) mutex = lock_create();
+	//lock(mutex);
 
 	va_list arg;
 	va_start(arg, format);
 	vprintf(format, arg);
 	va_end(arg);
 
-	unlock(mutex);
+	//unlock(mutex);
 }
 
 void sprintf(char* str, char* format, ...) {

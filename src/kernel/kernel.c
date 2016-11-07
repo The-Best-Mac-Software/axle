@@ -11,7 +11,7 @@
 #include <gfx/font/font.h>
 #include <kernel/util/syscall/syscall.h>
 #include <kernel/util/syscall/sysfuncs.h>
-#include <kernel/util/paging/descriptor_tables.h>
+#include <kernel/util/desc_tabs/descriptor_tables.h>
 #include <kernel/util/multitasking/tasks/task.h>
 #include <kernel/util/mutex/mutex.h>
 #include <kernel/util/vfs/initrd.h>
@@ -60,7 +60,7 @@ uint32_t module_detect(multiboot* mboot_ptr) {
 	printf_info("Detected %d GRUB modules", mboot_ptr->mods_count);
 	ASSERT(mboot_ptr->mods_count > 0, "no GRUB modules detected");
 	uint32_t initrd_loc = *((uint32_t*)mboot_ptr->mods_addr);
-	uint32_t initrd_end = *(uint32_t*)(mboot_ptr->mods_addr+4);
+	//uint32_t initrd_end = *(uint32_t*)(mboot_ptr->mods_addr+4);
 	//don't trample modules
 	//placement_address = initrd_end;
 	return initrd_loc;
@@ -81,8 +81,6 @@ void bootstrap_kernel(multiboot* mboot_ptr) {
 	//timer driver (many functions depend on timer interrupt so start early)
 	pit_install(1000);
 
-	//find any loaded grub modules
-	uint32_t initrd_loc = module_detect(mboot_ptr);
 	//physical memory manager
 	pmm_install(mboot_ptr->mem_upper);
 	//virtual memory manager (paging support)
@@ -124,6 +122,8 @@ void kernel_main(multiboot* mboot_ptr) {
 	printf_info("Bootstrapped, press any key to continue...");
 	key_block();
 
+	//find any loaded grub modules
+	//uint32_t initrd_loc = module_detect(mboot_ptr);
 	//initialize initrd, and set as fs root
 	//fs_root = initrd_install(initrd_loc);
 
@@ -151,6 +151,8 @@ void kernel_main(multiboot* mboot_ptr) {
 	while (1) {
 		sys_yield(RUNNABLE);
 	}
+	
+	while (1) {}
 
 	//if by some act of god we've reached this point, just give up and assert
 	ASSERT(0, "Kernel exited");

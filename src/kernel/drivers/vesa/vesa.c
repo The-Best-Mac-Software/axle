@@ -1,5 +1,4 @@
 #include "vesa.h"
-#include <kernel/util/paging/paging.h>
 #include <gfx/lib/shapes.h>
 #include <gfx/lib/view.h>
 #include <gfx/lib/gfx.h>
@@ -10,7 +9,7 @@
 #include <std/timer.h>
 #include <kernel/drivers/rtc/clock.h>
 
-extern page_directory_t* kernel_directory;
+//extern page_directory_t* kernel_directory;
 Window* create_window_int(Rect frame, bool root);
 
 //sets up VESA for mode

@@ -39,7 +39,8 @@ char kgetch() {
 }
 
 char getchar() {
-	sys_yield(KB_WAIT);
+	//sys_yield(KB_WAIT);
+	while (!haskey()) {}
 	return kgetch();
 }
 

@@ -9,7 +9,8 @@ void test_vesa();
 void test_heap();
 void test_printf();
 void test_time_unique();
-void test_malloc();
 void test_crypto();
+void test_vmm();
+void test_standard();
 
 #endif
