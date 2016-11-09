@@ -28,7 +28,6 @@ void force_page_fault() {
 	printf_info("Forcing page fault...");
 	uint32_t* ptr = (uint32_t*)0xA0000000;
 	uint32_t do_fault = *ptr;
-	printf_err("This should never be reached: %d", do_fault);
 }
 
 void test_interrupts() {

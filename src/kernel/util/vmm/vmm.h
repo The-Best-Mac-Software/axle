@@ -20,6 +20,12 @@ typedef uint32_t page_directory_t;
 
 //sets up paging structures and enables paging
 void paging_install();
+bool paging_installed();
+
+//sets cr2 paging bit
+void vmm_paging_enable();
+//clears cr2 paging bit
+void vmm_paging_disable();
 
 //switch address space
 void switch_page_directory(page_directory_t* pd);

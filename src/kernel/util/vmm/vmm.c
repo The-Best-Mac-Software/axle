@@ -17,8 +17,6 @@ void paging_install() {
 	kernel_begin_critical();
 	printf_info("Initializing paging...");
 
-	uint32_t cr0;
-
 	//page fault handler
 	register_interrupt_handler(14, &page_fault);
 
@@ -48,10 +46,8 @@ void paging_install() {
 	//paging dir initialized, start using it
 	switch_page_directory(p_dir);
 
-	//enable paging
-	asm volatile("mov %%cr0, %0" : "=r"(cr0));
-	cr0 |= 0x80000000;
-	asm volatile("mov %0, %%cr0" : : "r"(cr0));
+	//setup complete, turn on paging bit
+	vmm_paging_enable_int(true);
 
 	//we must map page table where physical mem manager keeps its page stack,
 	//or else it'll just panic on the first pmm_free_page() 
@@ -68,13 +64,44 @@ void paging_install() {
 	kernel_end_critical();
 }
 
+void vmm_paging_enable_int(bool force) {
+	if (!paging_installed() && !force) {
+		return;
+	}
+	//enable paging
+	uint32_t cr0;
+	asm volatile("mov %%cr0, %0" : "=r"(cr0));
+	cr0 |= 0x80000000;
+	asm volatile("mov %0, %%cr0" : : "r"(cr0));
+}
+
+void vmm_paging_enable() {
+	vmm_paging_enable_int(false);
+}
+
+void vmm_paging_disable() {
+	if (!paging_installed()) {
+		return;
+	}
+	//disable paging bit
+	uint32_t cr0;
+	asm volatile("mov %%cr0, %0" : "=r"(cr0));
+	//paging is most significant bit, keep everything but that
+	cr0 &= 0x7FFFFFFF;
+	asm volatile("mov %0, %%cr0" : : "r"(cr0));
+}
+
+bool paging_installed() {
+	return pmm_paging_active;
+}
+
 void switch_page_directory(page_directory_t* pd) {
 	current_directory = pd;
 	//load addr of new paging dir into cr3
 	asm volatile("mov %0, %%cr3" : : "r"(pd));
 }
 
-void vmm_map(uint32_t virt, uint32_t page, uint32_t flags) {
+void vmm_map(uint32_t virt, uint32_t phys, uint32_t flags) {
 	uint32_t virt_page = virt / PAGE_SIZE;
 	uint32_t pt_idx = PAGE_DIR_IDX(virt_page);
 
@@ -82,12 +109,11 @@ void vmm_map(uint32_t virt, uint32_t page, uint32_t flags) {
 	if (!page_directory[pt_idx]) {
 		//page table holding this page hasn't been created yet!
 		page_directory[pt_idx] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
-		printf("memset try pt %x %x\n", pt_idx, page_tables[pt_idx * 1024]);
 		//memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
 	}
 
 	//page table exists, update PTE
-	page_tables[virt_page] = (page & PAGE_MASK) | flags;
+	page_tables[virt_page] = (phys & PAGE_MASK) | flags;
 }
 
 void vmm_unmap(uint32_t virt) {
