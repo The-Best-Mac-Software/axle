@@ -147,8 +147,33 @@ void page_fault(registers_t regs) {
 	uint32_t cr2;
 	asm volatile("mov %%cr2, %0" : "=r"(cr2));
 
-	printf("page fault at %x, faulting addr %x\n", regs.eip, cr2);
-	printf("error code: %x\n", regs.err_code);
+	printf_dbg("page %x faulted (eip %x, err %x)", cr2, regs.eip, regs.err_code);
+
+	bool present = regs.err_code & 0x1;
+	bool rw = regs.err_code & 0x2;
+	bool user = regs.err_code & 0x4;
+
+	//if accessing a non-mapped page, map it
+	if (!present) {
+		if (rw) {
+			if (user) {
+				vmm_map(cr2, pmm_alloc_page(), PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+			}
+			else {
+				vmm_map(cr2, pmm_alloc_page(),  PAGE_PRESENT | PAGE_WRITE);
+			}
+		}
+		else {
+			if (user) {
+				vmm_map(cr2, pmm_alloc_page(), PAGE_PRESENT | PAGE_USER);
+			}
+			else {
+				vmm_map(cr2, pmm_alloc_page(), PAGE_PRESENT);
+			}
+		}
+		return;
+	}
+
 	printf("halting execution...");
 	ASSERT(0, "page fault");
 }
