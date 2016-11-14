@@ -8,11 +8,6 @@
 #include "view.h"
 #include <gfx/font/font.h>
 
-typedef struct __attribute__((packed)) {
-	unsigned short di, si, bp, sp, bx, dx, cx, ax;
-	unsigned short gs, fs, es, ds, eflags;
-} regs16_t;
-
 typedef struct screen_t {
 	Window* window; //root window
 	uint16_t pitch; //redundant?
@@ -28,8 +23,6 @@ typedef struct Vec2d {
 	double x;
 	double y;
 } Vec2d;
-
-extern void int32(unsigned char intnum, regs16_t* regs);
 
 Screen* screen_create(Size dimensions, uint32_t* physbase, uint8_t depth);
 

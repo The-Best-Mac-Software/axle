@@ -126,7 +126,8 @@ uint32_t time_unique() {
 char* date() {
 	read_rtc();
 
-	char* res = (char*)kmalloc(sizeof(char) * 64);
+	char* res = kmalloc(64);
+	memset(res, 0, 64);
 
 	char b[8];
 	itoa(hour, b);

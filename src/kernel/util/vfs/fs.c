@@ -1,5 +1,7 @@
 #include "fs.h"
 #include <std/std.h>
+#include <kernel/util/multitasking/tasks/task.h>
+#include <kernel/drivers/kb/kb.h>
 
 fs_node_t* fs_root = 0; //filesystem root
 
@@ -97,4 +99,46 @@ uint32_t fread(void* buffer, uint32_t size, uint32_t count, FILE* stream) {
 		chbuf[i] = buf;
 	}
 	return sum;
+}
+
+void stdin_read(char* buffer, uint32_t count) {
+	char ch;
+	for (uint32_t i = 0; i < count; i++) {
+		ch = getchar();
+		printf("ch: %c", ch);
+		*buffer++ = ch;
+	}
+}
+void stdout_read(char* buffer, uint32_t count) {
+	char ch;
+	for (uint32_t i = 0; i < count; i++) {
+		ch = getchar();
+		if (!ch) break;
+
+		*buffer = ch;
+		buffer++;
+	}
+}
+void stderr_read(char* buffer, uint32_t count) {
+	char ch;
+	for (uint32_t i = 0; i < count; i++) {
+		ch = getchar();
+		if (!ch) break;
+
+		*buffer = ch;
+		buffer++;
+	}
+}
+
+uint32_t read(int fd, char* buffer, uint32_t count) {
+	extern task_t* current_task;
+	uint32_t addr = (uint32_t)array_m_lookup(current_task->files, fd);
+	if (addr <= 0) {
+		ASSERT(0, "Tried to read invalid file descriptor %d", fd);
+	}
+	void (*handle)(char*, uint32_t) = (void(*)(char*, uint32_t))addr;
+	handle(buffer, count);
+
+	//TODO return number of bytes read
+	return count;
 }

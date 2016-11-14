@@ -11,6 +11,7 @@
 #include <kernel/drivers/vesa/vesa.h>
 #include "color.h"
 #include "shader.h"
+#include <kernel/bios/int32.h>
 
 //private Window function to create root window
 Window* create_window_int(Rect frame, bool root);

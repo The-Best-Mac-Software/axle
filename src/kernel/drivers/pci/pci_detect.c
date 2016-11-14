@@ -84,6 +84,7 @@ uint16_t pci_device_id(uint16_t bus, uint16_t device, uint16_t function) {
 }
 
 void pci_print_device(pci_device* device) {
+	//TODO move these definitions into their own file
 #define INTEL_VENDOR 0x8086
 #define TECH_CORP_VENDOR 0x1234
 	//TODO fix naming below to remove this var
@@ -144,6 +145,8 @@ void pci_traverse_buses(void) {
 		for (uint32_t slot = 0; slot < 32; slot++) {
 			for (uint32_t func = 0; func < 8; func++) {
 				uint16_t vendor = pci_vendor_id(bus, slot, func);
+
+				//invalid device, skip this
 				if (vendor == 0xFFFF) continue;
 
 				uint16_t device_id = pci_device_id(bus, slot, func);

@@ -67,4 +67,8 @@ FILE* fopen(char* filename, char* mode);
 uint8_t fgetc(FILE* stream);
 uint32_t fread(void* buffer, uint32_t size, uint32_t count, FILE* stream);
 
+//standard POSIX read function
+//reads up to count characters into buffer from file descriptor fd
+uint32_t read(int fd, char* buffer, uint32_t count);
+
 #endif
