@@ -101,7 +101,10 @@ static void key_block() {
 	}
 }
 
-void kernel_main(multiboot* mboot_ptr) {
+uint32_t initial_esp;
+void kernel_main(multiboot* mboot_ptr, uint32_t initial_stack) {
+	initial_esp = initial_stack;
+
 	//initialize terminal interface
 	terminal_initialize();
 	bootstrap_kernel(mboot_ptr);
@@ -111,7 +114,7 @@ void kernel_main(multiboot* mboot_ptr) {
 	printf("Available memory: %d -> %dMB\n", mboot_ptr->mem_upper, (mboot_ptr->mem_upper/1024));
 
 	//tasking_install(PRIORITIZE_INTERACTIVE);
-	tasking_install(LOW_LATENCY);
+	//tasking_install(LOW_LATENCY);
 
 	//drivers
 	sys_install();
@@ -128,7 +131,10 @@ void kernel_main(multiboot* mboot_ptr) {
 	//fs_root = initrd_install(initrd_loc);
 
 	//test facilities
-	test_standard();
+	//test_standard();
+
+	//task_switch();
+	//goto_pid(2);
 
 	//if (!fork("shell")) {
 		//start shell

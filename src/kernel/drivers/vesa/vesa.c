@@ -8,6 +8,7 @@
 #include <kernel/kernel.h>
 #include <std/timer.h>
 #include <kernel/drivers/rtc/clock.h>
+#include <kernel/bios/int32.h>
 
 //extern page_directory_t* kernel_directory;
 Window* create_window_int(Rect frame, bool root);

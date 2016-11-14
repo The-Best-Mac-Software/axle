@@ -11,6 +11,9 @@ uint32_t* page_tables = (uint32_t*)PAGE_TABLE_VIRT_ADDR;
 page_directory_t* current_directory;
 extern bool pmm_paging_active;
 
+extern uint32_t end;
+uint32_t placement_address = &end;
+
 void page_fault(registers_t regs);
 
 void paging_install() {
@@ -28,7 +31,7 @@ void paging_install() {
 	p_dir[0] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
 	uint32_t* p_table = (uint32_t*)(p_dir[0] & PAGE_MASK);
 	//initialize all pages in table
-	for (int i = 0; i < 1024; i++) {
+	for (int i = 0; i < 0x1000; i++) {
 		p_table[i] = i * PAGE_SIZE | PAGE_PRESENT | PAGE_WRITE;
 	}
 
@@ -53,7 +56,6 @@ void paging_install() {
 	//or else it'll just panic on the first pmm_free_page() 
 	uint32_t pt_idx = PAGE_DIR_IDX((PMM_STACK_ADDR >> 12));
 	page_directory[pt_idx] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
-	printf("memset pt %x %x\n", pt_idx, page_tables[pt_idx * 1024]);
 	memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
 
 	//paging is active!
@@ -109,7 +111,7 @@ void vmm_map(uint32_t virt, uint32_t phys, uint32_t flags) {
 	if (!page_directory[pt_idx]) {
 		//page table holding this page hasn't been created yet!
 		page_directory[pt_idx] = pmm_alloc_page() | PAGE_PRESENT | PAGE_WRITE;
-		//memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
+		memset((uint8_t*)page_tables[pt_idx * 1024], 0, PAGE_SIZE);
 	}
 
 	//page table exists, update PTE
@@ -144,10 +146,11 @@ bool vmm_get_mapping(uint32_t virt, uint32_t* phys) {
 }
 
 void page_fault(registers_t regs) {
+	static int fault_count = 0;
+
 	uint32_t cr2;
 	asm volatile("mov %%cr2, %0" : "=r"(cr2));
 
-	printf_dbg("page %x faulted (eip %x, err %x)", cr2, regs.eip, regs.err_code);
 
 	bool present = regs.err_code & 0x1;
 	bool rw = regs.err_code & 0x2;
@@ -155,6 +158,7 @@ void page_fault(registers_t regs) {
 
 	//if accessing a non-mapped page, map it
 	if (!present) {
+		fault_count++;
 		if (rw) {
 			if (user) {
 				vmm_map(cr2, pmm_alloc_page(), PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
@@ -171,10 +175,15 @@ void page_fault(registers_t regs) {
 				vmm_map(cr2, pmm_alloc_page(), PAGE_PRESENT);
 			}
 		}
+
+		printf_dbg("recovered from %d page faults", fault_count);
+		fault_count = 0;
 		return;
 	}
 
-	printf("halting execution...");
+	printf_dbg("page %x faulted (eip %x, err %x)", cr2, regs.eip, regs.err_code);
+	printf_dbg("could not recover.");
+	printf_dbg("halting execution...");
 	ASSERT(0, "page fault");
 }
 
