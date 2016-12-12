@@ -4,6 +4,7 @@
 #include <std/std.h>
 #include <kernel/util/multitasking/tasks/task.h>
 #include <kernel/util/syscall/sysfuncs.h>
+#include <kernel/drivers/rtc/clock.h>
 
 typedef unsigned char byte;
 typedef signed char sbyte;
@@ -15,6 +16,7 @@ volatile uint8_t mouse_state;
 
 Coordinate mouse_point() {
 	static Coordinate previous_pos;
+	//tstatic uint32_t last_time;
 
 	Coordinate new_pos = point_make(running_x, running_y);
 	//initial case, no previous mouse position recorded
@@ -23,24 +25,41 @@ Coordinate mouse_point() {
 		return new_pos;
 	}
 
+	//save time if mouse position hasn't changed
+	if (previous_pos.x == running_x && previous_pos.y == running_y) {
+		return new_pos;
+	}
+
 	//mouse acceleration
 	//new position = new_pos + sqrt(offset from last pos)
 	//provides logarithmic acceleration
+	//uint32_t new_time = time();
+	/*
 	{
 		//left or right?
 		int dir = new_pos.x > previous_pos.x;
+		
+		float offset = sqrt(abs(new_pos.x - previous_pos.x));
+		if (last_time) {
+			offset *= ((new_time - last_time) / 1000);
+		}
 
-		int offset = (int)sqrt(abs(new_pos.x - previous_pos.x));
-		new_pos.x = (dir) ? (previous_pos.x + offset) : (previous_pos.x - offset);
+		new_pos.x = (dir) ? (previous_pos.x * offset) : (previous_pos.x * (-offset));
 	}
 	{
 		//up or down?
-		int dir = new_pos.y < previous_pos.y;
+		int dir = new_pos.y > previous_pos.y;
 
-		int offset = (int)sqrt(abs(new_pos.y - previous_pos.y));
-		new_pos.y = (!dir) ? (previous_pos.y + offset) : (previous_pos.y - offset);
+		float offset = sqrt(abs(new_pos.y - previous_pos.y));
+		if (last_time) {
+			offset *= ((new_time - last_time) / 1000);
+		}
+
+		new_pos.y = (dir) ? (previous_pos.y * offset) : (previous_pos.y * (-offset));
 	}
-
+	*/
+	
+	//last_time = new_time;
 	previous_pos = new_pos;
 	return new_pos;
 }
@@ -75,6 +94,7 @@ void mouse_callback(registers_t regs) {
 			mouse_cycle++;
 
 			//this byte contains information about mouse state (button events)
+			mouse_state = 0;
 			bool middle = mouse_byte[1] & 0x4;
 			if (middle) mouse_state |= 0x4;
 			else mouse_state &= ~0x4;
@@ -98,8 +118,8 @@ void mouse_callback(registers_t regs) {
 
 			//hook into task switch
 			//trigger iosentinel
-			extern void update_blocked_tasks();
-			update_blocked_tasks();
+			//extern void update_blocked_tasks();
+			//update_blocked_tasks();
 			
 			break;
 	}
@@ -173,5 +193,5 @@ void mouse_install() {
 }
 
 void mouse_event_wait() {
-	sys_yield(MOUSE_WAIT);
+	//sys_yield(MOUSE_WAIT);
 }

@@ -2,6 +2,7 @@
 #include <std/std.h>
 #include <kernel/util/vfs/fs.h>
 #include "gfx.h"
+#include <user/programs/jpeg.h>
 
 void bmp_teardown(Bmp* bmp) {
 	if (!bmp) return;
@@ -48,6 +49,38 @@ Bmp* load_bmp(Rect frame, char* filename) {
 		//we only use 24bit, so don't try to read it
 		//fgetc(file);
 	}
+
+	Bmp* bmp = create_bmp(frame, layer);
+	return bmp;
+}
+
+static bool done_jpeg_init = false;
+Bmp* load_jpeg(Rect frame, char* filename) {
+	if (!done_jpeg_init) {
+		njInit();
+		done_jpeg_init = true;
+	}
+
+	FILE* file = fopen(filename, (char*)"");
+	if (!file) {
+		printf_err("File %s not found! Not loading JPEG", filename);
+		return NULL;
+	}
+
+	char* buf = kmalloc(ftell(file));
+	fread(buf, sizeof(char), ftell(file), file);
+	njDecode(buf, ftell(file));
+	kfree(buf);
+
+	int width = njGetWidth();
+	int height = njGetHeight();
+	printf_info("decoding JPEG with dimensions (%d,%d}", width, height);
+
+	int bpp = gfx_bpp();
+	ca_layer* layer = create_layer(size_make(width, height));
+	unsigned char* decoded = njGetImage();
+
+	memcpy(layer->raw, decoded, width * height * bpp);
 
 	Bmp* bmp = create_bmp(frame, layer);
 	return bmp;

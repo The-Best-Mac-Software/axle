@@ -19,26 +19,38 @@ STDAPI void* kmalloc_ap(uint32_t sz, uint32_t* phys);
 //normal kmalloc
 STDAPI void* kmalloc(uint32_t sz);
 
-#define KHEAP_START		0xC0000000
+/*
+#define KHEAP_START			0xC0000000
 #define KHEAP_INITIAL_SIZE	0x100000
 //#define KHEAP_MAX_ADDRESS	0xFFFFF000
 #define KHEAP_MAX_ADDRESS 	0xCFFFF000
 
 #define HEAP_INDEX_SIZE		0x20000
-#define HEAP_MAGIC		0x25A56F9C
+#define HEAP_MAGIC			0x25A56F9C
+#define HEAP_MIN_SIZE		0x70000
+/*
+#define KHEAP_START 0xC0000000
+#define KHEAP_INITIAL_SIZE 0x100000
+#define KHEAP_MAX_ADDRESS 0xCFFFF000
+
+#define HEAP_INDEX_SIZE 0x20000
+#define HEAP_MAGIC 0xAC739AFC
+#define HEAP_MIN_SIZE 0x70000
+*/
+
+#define KHEAP_START			0xC0000000
+#define KHEAP_INITIAL_SIZE	0x100000
+#define HEAP_MAGIC			0xDEADBEEF
 #define HEAP_MIN_SIZE		0x70000
 
 //size information for hole/block
-typedef struct {
+typedef struct header_t {
 	uint32_t magic; //magic number
 	uint8_t hole; //block or hole?
 	uint32_t size; //size, including end footer
+	struct header_t* prev;
+	struct header_t* next;
 } header_t;
-
-typedef struct {
-	uint32_t magic; 
-	header_t* header; //reference to header
-} footer_t;
 
 typedef struct {
 	array_o* index;

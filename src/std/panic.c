@@ -21,6 +21,7 @@ static inline void print_stack(void) {
 	// First stack frame is a panic() function, so ignore it
 	TRY_PRINT_FRAME(1);
 	TRY_PRINT_FRAME(2);
+	/*
 	TRY_PRINT_FRAME(3);
 	TRY_PRINT_FRAME(4);
 	TRY_PRINT_FRAME(5);
@@ -35,14 +36,15 @@ static inline void print_stack(void) {
 	TRY_PRINT_FRAME(14);
 	TRY_PRINT_FRAME(15);
 	TRY_PRINT_FRAME(16);
+	*/
 }
 #pragma GCC diagnostic pop
 
 __attribute__((__noreturn__)) void panic(uint16_t line, const char* file) {
-	printf("\n");
-	printf_err("PANIC %s: line %d", file, line);
+	//printf("\n");
+	//printf_err("PANIC %s: line %d", file, line);
 
-	print_stack();
+	//print_stack();
 
 	//enter infinite loop
     kernel_begin_critical();
@@ -50,8 +52,8 @@ __attribute__((__noreturn__)) void panic(uint16_t line, const char* file) {
 }
 
 __attribute__((__noreturn__)) void panic_msg(uint16_t line, const char* file, const char* msg, ...) {
-	extern void switch_to_text();
-	switch_to_text();
+	//extern void switch_to_text();
+	//switch_to_text();
 
 	terminal_clear();
 

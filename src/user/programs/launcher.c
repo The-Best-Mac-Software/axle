@@ -5,24 +5,33 @@
 #include <gfx/lib/button.h>
 #include <std/string.h>
 
+static void image_viewer() {
+	Window* image_viewer = create_window(rect_make(point_make(400, 50), size_make(512, 512)));
+	image_viewer->title = "Image Viewer";
+	image_viewer->content_view->background_color = color_make(135, 206, 250);
+	//Bmp* bmp = load_bmp(rect_make(point_zero(), size_make(600, 600)), "Lenna.bmp");
+	Bmp* bmp = load_jpeg(rect_make(point_zero(), size_make(313, 234)), "./jpeg_test.jpg");
+	if (bmp) {
+		add_bmp(image_viewer->content_view, bmp);
+	}
+	present_window(image_viewer);
+}
+
+static void text_viewer() {
+	Window* label_win = create_window(rect_make(point_make(100, 100), size_make(500, 500)));
+	label_win->title = "Text test";
+	Label* test_label = create_label(rect_make(point_make(10, 10), size_make(label_win->content_view->frame.size.width - 10, label_win->content_view->frame.size.height - 20)), "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque pulvinar dui bibendum nunc convallis, bibendum venenatis mauris ornare. Donec et libero lacus. Nulla tristique auctor pulvinar. Aenean enim elit, malesuada nec dignissim eget, varius ac nunc. Vestibulum varius lectus nisi, in dignissim orci volutpat in. Aliquam eget eros lorem. Quisque tempor est a rhoncus consequat. Quisque vestibulum finibus sapien. Etiam enim sem, vehicula ac lorem vitae, mattis mollis mauris. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Vivamus eleifend dui vel nulla suscipit pretium. Suspendisse vel nunc efficitur, lobortis dui convallis, tristique tellus. Ut ut viverra est. Etiam tempor justo risus. Cras laoreet eu sapien et lacinia. Nunc imperdiet blandit purus a semper.");
+	add_sublabel(label_win->content_view, test_label);
+	present_window(label_win);
+}
+
 static void launcher_buttonpress(Button* b) {
 	char* title = b->label->text;
 	if (!strcmp(title, "Image Viewer")) {
-		Window* image_viewer = create_window(rect_make(point_make(400, 50), size_make(512, 512)));
-		image_viewer->title = "Image Viewer";
-		image_viewer->content_view->background_color = color_make(135, 206, 250);
-		Bmp* bmp = load_bmp(rect_make(point_zero(), size_make(600, 600)), "Lenna.bmp");
-		if (bmp) {
-			add_bmp(image_viewer->content_view, bmp);
-		}
-		present_window(image_viewer);
+		image_viewer();
 	}
 	if (!strcmp(title, "Text Viewer")) {
-		Window* label_win = create_window(rect_make(point_make(100, 100), size_make(500, 500)));
-		label_win->title = "Text test";
-		Label* test_label = create_label(rect_make(point_make(10, 10), size_make(label_win->content_view->frame.size.width - 10, label_win->content_view->frame.size.height - 20)), "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque pulvinar dui bibendum nunc convallis, bibendum venenatis mauris ornare. Donec et libero lacus. Nulla tristique auctor pulvinar. Aenean enim elit, malesuada nec dignissim eget, varius ac nunc. Vestibulum varius lectus nisi, in dignissim orci volutpat in. Aliquam eget eros lorem. Quisque tempor est a rhoncus consequat. Quisque vestibulum finibus sapien. Etiam enim sem, vehicula ac lorem vitae, mattis mollis mauris. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Vivamus eleifend dui vel nulla suscipit pretium. Suspendisse vel nunc efficitur, lobortis dui convallis, tristique tellus. Ut ut viverra est. Etiam tempor justo risus. Cras laoreet eu sapien et lacinia. Nunc imperdiet blandit purus a semper.");
-		add_sublabel(label_win->content_view, test_label);
-		present_window(label_win);
+		text_viewer();
 	}
 	if (!strcmp(title, "Calculator")) {
 		calculator_xserv();

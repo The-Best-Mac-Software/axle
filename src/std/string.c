@@ -114,6 +114,7 @@ char *strtok_r (char *s, const char *delim, char **save_ptr) {
 	return token;
 }
 
+/*
 char **strsplit(const char *string, const char *delim, size_t *out) {
 	if (!string || !string[0]) {
 		return NULL;
@@ -143,6 +144,7 @@ char **strsplit(const char *string, const char *delim, size_t *out) {
 
 	return v;
 }
+*/
 
 size_t strlen(const char* str) {
 	size_t ret = 0;
@@ -190,12 +192,14 @@ int isspace(char c) {
     return (c == ' ' || c == '\t' || c == '\n' || c == '\12');
 }
 
+/*
 char *strdup (const char *s) {
 	char *d = (char*)kmalloc (strlen (s) + 1);
 	if (d == NULL) return NULL;
 	strcpy (d,s);
 	return d;
 }
+*/
 
 size_t strspn(const char *str, const char *accept) {
 	if (accept[0] == '\0') {

@@ -1,6 +1,7 @@
 #include "memory.h"
 #include <stdint.h>
 #include <std/kheap.h>
+#include "unlikely.h"
 
 int memcmp(const void* aptr, const void* bptr, size_t size) {
 	const unsigned char* a = (const unsigned char*) aptr;
@@ -86,11 +87,13 @@ void memadd(void* dstptr, void* srcptr, size_t size) {
 	}
 }
 
+/*
 void* calloc(size_t num, size_t size) {
 	void* mem = (void*)kmalloc(num * size);
 	memset(mem, 0, num * size);
 	return mem;
 }
+*/
 
 static size_t getsize(void* p) {
 	size_t* in = (size_t*)p;
@@ -101,6 +104,7 @@ static size_t getsize(void* p) {
 	return -1;
 }
 
+/*
 void* realloc(void* ptr, size_t size) {
 	void* newptr;
 	size_t msize = getsize(ptr);
@@ -112,10 +116,11 @@ void* realloc(void* ptr, size_t size) {
 	kfree(ptr);
 	return newptr;
 }
+*/
 
 void *memcpy(void *restrict s1, const void *restrict s2, size_t n) {
     // Check for bad usage of memcpy
-    if(!n) {
+    if(unlikely(!n)) {
 		return s1;
 	}
     
@@ -127,7 +132,7 @@ void *memcpy(void *restrict s1, const void *restrict s2, size_t n) {
 
     size_t unused;
     // see if it's even worth aligning
-    if(n <= sizeof(size_t)) {
+    if(unlikely(n <= sizeof(size_t))) {
         asm volatile("rep movsb;":"=c"(unused):"D"(p1), "S"(p2), "c"(n));
         return s1;
     }

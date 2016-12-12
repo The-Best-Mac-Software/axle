@@ -23,22 +23,22 @@ void process_gfx_switch(Screen* screen, int new_depth) {
 
 inline int gfx_depth() {
 	if (!current_depth) {
-		//fall back on assuming VESA
-		current_depth = VESA_DEPTH;
+		//fall back on assuming VGA
+		current_depth = VGA_DEPTH;
 	}
 	return current_depth;
 }
 
 inline int gfx_bpp() {
 	if (!current_depth) {
-		//fall back on assuming VESA
-		current_depth = VESA_DEPTH;
+		//fall back on assuming VGA
+		current_depth = VGA_DEPTH;
 	}
 	//each px component is 8 bits
 	return current_depth / 8;
 }
 
-Screen* gfx_screen() {
+inline Screen* gfx_screen() {
 	return current_screen;
 }
 
@@ -93,7 +93,7 @@ void fill_screen(Screen* screen, Color color) {
 }
 
 void write_screen(Screen* screen) {
-	vsync();
+	//vsync();
 	memcpy(screen->physbase, screen->vmem->raw, screen->vmem->size.width * screen->vmem->size.height * gfx_bpp());
 }
 

@@ -31,9 +31,11 @@ STDAPI void array_m_insert(array_m* array, type_t item);
 //STDAPI type_t array_m_lookup(array_m* array, int32_t i);
 __attribute__((always_inline))
 inline type_t array_m_lookup(array_m* array, int32_t i) {
+	/*
 	ASSERT(i < array->size && i >= 0, "index (%d) was out of bounds (%d)", i, array->size - 1);
 
 	return array->array[i];
+	*/
 }
 
 //find index of item

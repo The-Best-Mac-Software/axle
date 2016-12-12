@@ -1,14 +1,16 @@
 #include "terminal.h"
 #include <std/panic.h>
-#include <kernel/util/mutex/mutex.h>
+//#include <kernel/util/mutex/mutex.h>
 #include <std/std.h>
 #include <std/ctype.h>
 #include <std/math.h>
 #include <kernel/util/kbman/kbman.h>
+#include "recorder.h"
 
 #define TERM_HISTORY_MAX 2048
 
 /// Shared lock to keep all terminal operations atomic
+typedef struct lock_t lock_t;
 static lock_t* mutex;
 
 /// Combines a foreground and background color
@@ -41,14 +43,19 @@ static struct term_cursor g_cursor_pos;
 static rawcolor g_terminal_color;
 
 /// Screen buffer for the terminal
-static term_display* const g_terminal_buffer = (term_display*)0xB8000;
+static term_display* const g_terminal_buffer = (term_display*)(KERN_VMA + 0xB8000);
 
 /// Buffer to keep track of terminal history, not just what's currently visible
-array_m* term_history;
+//array_m* term_history;
+
+typedef struct lock_t lock_t;
+void* lock_create() {}
+void lock(void* a) {}
+void unlock(void* a) {}
 
 /// Keeps state of when we're redrawing the terminal while scrolling
 /// No history is recorded while this flag is set
-static volatile bool is_scroll_redraw;
+volatile bool is_scroll_redraw;
 
 static void push_back_line(void);
 static void newline(void);
@@ -70,7 +77,7 @@ void terminal_initialize(void) {
 	mutex = lock_create();
 
 	is_scroll_redraw = false;
-	term_history = array_m_create(TERM_HISTORY_MAX);
+	//term_history = array_m_create(TERM_HISTORY_MAX);
 
 	//set up first line buffer
 	term_end_line();
@@ -92,135 +99,27 @@ void terminal_clear(void) {
 	unlock(mutex);
 }
 
-static void push_back_line(void) {
-	lock(mutex);
-
-	// Move all lines up one. This won't clear the last line
-	for(uint16_t y = 1; y < TERM_HEIGHT; y++) {
-		memcpy(&g_terminal_buffer->grid[y-1][0],
-		       &g_terminal_buffer->grid[y][0],
-		       TERM_WIDTH * sizeof(g_terminal_buffer->grid[0][0]));
-	}
-
-	// Clear the last line
-	uint16_t blank = make_terminal_entry(' ', g_terminal_color);
-	for(uint16_t x = 0; x < TERM_WIDTH; x++) {
-		g_terminal_buffer->grid[TERM_HEIGHT - 1][x] = blank;
-	}
-
-	unlock(mutex);
+static uint16_t make_terminal_entry(uint8_t ch, rawcolor color) {
+	return (color.raw << 8) | ch;
 }
 
-static void term_end_line() {
-	if (is_scroll_redraw) return;
-
-	//if history is at capacity, dump the oldest line
-    while (term_history->size >= TERM_HISTORY_MAX - 1) {
-        array_m_remove(term_history, 0);
-    }
-
-	char* newline = (char*)kmalloc(sizeof(char) * TERM_WIDTH * 2);
-	array_m_insert(term_history, newline);
+static rawcolor make_color(term_color fg, term_color bg) {
+	rawcolor ret;
+	ret.fg =  fg;
+	ret.bg = bg;
+	return ret;
 }
 
-static void term_record_char(char ch) {
-	if (is_scroll_redraw) return;
+void terminal_setcolor(term_color fg, term_color bg) {
+	if (fg > 15 || bg > 15) return;
 
-	//add this character to line buffer
-	char* current = (char*)array_m_lookup(term_history, term_history->size - 1);
-	strccat(current, ch);
+	term_record_color((term_cell_color){fg, bg});
+	g_terminal_color = make_color(fg, bg);
 }
 
-static void term_record_backspace() {
-	if (is_scroll_redraw) return;
-
-	// remove backspaced character
-	// remove space rendered in place of backspaced character
-	char* current = (char*)array_m_lookup(term_history, term_history->size - 1);
-	current[strlen(current) - 2] = '\0';
-}
-
-static void term_scroll_to_bottom() {
-	while (scroll_state.height > 0) {
-		term_scroll(TERM_SCROLL_DOWN);
-	}
-}
-
-typedef struct term_cell_color {
-	term_color fg;
-	term_color bg;
-} term_cell_color;
-
-static void term_record_color(term_cell_color col) {
-	if (is_scroll_redraw) return;
-
-	//append color format to line history
-	char* current = (char*)array_m_lookup(term_history, term_history->size - 1);
-	strcat(current, "\e[");
-
-	//convert color code to string
-	char buf[3];
-	itoa(col.fg, buf);
-	buf[2] = '\0';
-
-	strcat(current, buf);
-	strcat(current, ";");
-}
-
-static void newline(void) {
-	//flush the current line to terminal history
-	term_end_line();
-
-	g_cursor_pos.x = 0;
-	if(++g_cursor_pos.y >= TERM_HEIGHT) {
-		push_back_line();
-		g_cursor_pos.y = TERM_HEIGHT - 1;
-	}
-}
-
-static void putraw(char ch) {
-	lock(mutex);
-
-	term_record_char(ch);
-
-	// Find where to draw the character
-	uint16_t* entry = &g_terminal_buffer->grid[g_cursor_pos.y][g_cursor_pos.x];
-
-	// Draw the character
-	*entry = make_terminal_entry(ch, g_terminal_color);
-
-	// Advance cursor to next valid position
-	if(++g_cursor_pos.x >= TERM_WIDTH) {
-		newline();
-	}
-
-	unlock(mutex);
-}
-
-static void backspace(void) {
-	term_cursor new_pos;
-	if(g_cursor_pos.x == 0) {
-		if(g_cursor_pos.y == 0) {
-			// Can't delete if we're at the first spot
-			return;
-		}
-
-		// Go back to last column on previous line
-		new_pos.x = TERM_WIDTH - 1;
-		new_pos.y = g_cursor_pos.y - 1;
-	}
-	else {
-		// Go back one character on this line
-		new_pos.x = g_cursor_pos.x - 1;
-		new_pos.y = g_cursor_pos.y;
-	}
-
-	// Draw a space over the previous character, then back up
-	g_cursor_pos = new_pos;
-	putraw(' ');
-	g_cursor_pos = new_pos;
-
-	term_record_backspace();
+void terminal_setcursor(term_cursor curs) {
+	ASSERT(curs.x < TERM_WIDTH && curs.y < TERM_HEIGHT,	"Cursor out of bounds: (%d, %d)", curs.x, curs.y);
+	g_cursor_pos = curs;
 }
 
 //TODO REWORK THIS
@@ -313,28 +212,85 @@ void terminal_putchar(char ch) {
 	terminal_updatecursor();
 }
 
+static void putraw(char ch) {
+	lock(mutex);
+
+	term_record_char(ch);
+
+	// Find where to draw the character
+	uint32_t* entry = &g_terminal_buffer->grid[g_cursor_pos.y][g_cursor_pos.x];
+
+	// Draw the character
+	*entry = make_terminal_entry(ch, g_terminal_color);
+
+	// Advance cursor to next valid position
+	if(++g_cursor_pos.x >= TERM_WIDTH) {
+		newline();
+	}
+
+	unlock(mutex);
+}
+
 void terminal_writestring(const char* str) {
 	while(*str != '\0') {
 		terminal_putchar(*str++);
 	}
 }
 
-static rawcolor make_color(term_color fg, term_color bg) {
-	rawcolor ret;
-	ret.fg =  fg;
-	ret.bg = bg;
-	return ret;
+static void push_back_line(void) {
+	lock(mutex);
+
+	// Move all lines up one. This won't clear the last line
+	for(uint16_t y = 1; y < TERM_HEIGHT; y++) {
+		memcpy(&g_terminal_buffer->grid[y-1][0],
+		       &g_terminal_buffer->grid[y][0],
+		       TERM_WIDTH * sizeof(g_terminal_buffer->grid[0][0]));
+	}
+
+	// Clear the last line
+	uint16_t blank = make_terminal_entry(' ', g_terminal_color);
+	for(uint16_t x = 0; x < TERM_WIDTH; x++) {
+		g_terminal_buffer->grid[TERM_HEIGHT - 1][x] = blank;
+	}
+
+	unlock(mutex);
 }
 
-static uint16_t make_terminal_entry(uint8_t ch, rawcolor color) {
-	return (color.raw << 8) | ch;
+static void newline(void) {
+	//flush the current line to terminal history
+	term_end_line();
+
+	g_cursor_pos.x = 0;
+	if(++g_cursor_pos.y >= TERM_HEIGHT) {
+		//push_back_line();
+		g_cursor_pos.y = TERM_HEIGHT - 1;
+	}
 }
 
-void terminal_setcolor(term_color fg, term_color bg) {
-	if (fg > 15 || bg > 15) return;
+static void backspace(void) {
+	term_cursor new_pos;
+	if(g_cursor_pos.x == 0) {
+		if(g_cursor_pos.y == 0) {
+			// Can't delete if we're at the first spot
+			return;
+		}
 
-	term_record_color((term_cell_color){fg, bg});
-	g_terminal_color = make_color(fg, bg);
+		// Go back to last column on previous line
+		new_pos.x = TERM_WIDTH - 1;
+		new_pos.y = g_cursor_pos.y - 1;
+	}
+	else {
+		// Go back one character on this line
+		new_pos.x = g_cursor_pos.x - 1;
+		new_pos.y = g_cursor_pos.y;
+	}
+
+	// Draw a space over the previous character, then back up
+	g_cursor_pos = new_pos;
+	putraw(' ');
+	g_cursor_pos = new_pos;
+
+	term_record_backspace();
 }
 
 void terminal_settextcolor(term_color color) {
@@ -349,10 +305,25 @@ term_cursor terminal_getcursor(void) {
 	return g_cursor_pos;
 }
 
-void terminal_setcursor(term_cursor curs) {
-	ASSERT(curs.x < TERM_WIDTH && curs.y < TERM_HEIGHT,
-		"Cursor out of bounds: (%d, %d)", curs.x, curs.y);
-	g_cursor_pos = curs;
+
+static void term_end_line() {
+	if (is_scroll_redraw) return;
+
+	//if history is at capacity, dump the oldest line
+	/*
+    while (term_history->size >= TERM_HISTORY_MAX - 1) {
+        //array_m_remove(term_history, 0);
+    }
+	*/
+
+	//char* newline = (char*)kmalloc(sizeof(char) * TERM_WIDTH * 2);
+	//array_m_insert(term_history, newline);
+}
+
+void term_scroll_to_bottom() {
+	while (scroll_state.height > 0) {
+		term_scroll(TERM_SCROLL_DOWN);
+	}
 }
 
 void terminal_updatecursor(void) {
@@ -371,6 +342,7 @@ void terminal_movecursor(term_cursor loc) {
 void term_scroll(term_scroll_direction dir) {
 	lock(mutex);
 
+	/*
 	if (dir == TERM_SCROLL_UP) {
 		if (scroll_state.height + TERM_HEIGHT == term_history->size) return;
 		scroll_state.height++;
@@ -389,8 +361,10 @@ void term_scroll(term_scroll_direction dir) {
 		printf("%s", line);
 		if (y < TERM_HEIGHT - 1) printf("\n");
 	}
+	*/
 
 	is_scroll_redraw = false;
 
 	unlock(mutex);
 }
+

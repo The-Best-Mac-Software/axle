@@ -3,6 +3,7 @@
 
 #include <std/common.h>
 #include <std/timer.h>
+#include <std/unlikely.h>
 
 typedef void (*event_handler)(void* obj, void* context);
 
@@ -56,27 +57,32 @@ Vec2d vec2d(double x, float y);
 __attribute__((always_inline))
 inline void putpixel(ca_layer* layer, int x, int y, Color color) {
 	//don't attempt writing a pixel outside of screen bounds
-	if (x < 0 || y < 0 || x >= layer->size.width || y >= layer->size.height) return;
+	if (unlikely(x < 0 || y < 0 || x >= layer->size.width || y >= layer->size.height)) return;
 
 	int depth = gfx_depth();
-	if (depth == VGA_DEPTH) {
+	//8 bits in a byte
+	int bpp = depth / 8;
+	if (1 || bpp == 1) {
 		//VGA mode
-		uint16_t loc = ((y * layer->size.width * gfx_bpp()) + (x * gfx_bpp()));
+		uint32_t loc = ((y * layer->size.width) + x);
 		layer->raw[loc] = color.val[0];
 	}
 	else {
 		//VESA mode
-		int offset = (x * gfx_bpp()) + (y * layer->size.width * gfx_bpp());
+		int offset = (x * bpp) + (y * layer->size.width * bpp);
 		//we have to write the pixels in BGR, not RGB
+		layer->raw[offset] = color.raw;;
+		/*
 		layer->raw[offset + 0] = color.val[2];
 		layer->raw[offset + 1] = color.val[1];
 		layer->raw[offset + 2] = color.val[0];
+		*/
 	}
 }
 __attribute__((always_inline))
 inline void addpixel(ca_layer* layer, int x, int y, Color color) {
 	//don't attempt writing a pixel outside of screen bounds
-	if (x < 0 || y < 0 || x >= layer->size.width || y >= layer->size.height) return;
+	if (unlikely(x < 0 || y < 0 || x >= layer->size.width || y >= layer->size.height)) return;
 
 	int depth = gfx_depth();
 	if (depth == VGA_DEPTH) {

@@ -31,3 +31,16 @@ flush_cache:
 	mov eax, cr3
 	mov cr3, eax
 	retn
+
+; .text section is around 0x10000
+; enable paging in physical kernel mem
+; and higher-half virtual
+[EXTERN paging_enable];
+[GLOBAL enter_higher_half]
+enter_higher_half:
+	lea ebx, [higher_half] ; load addr of label 
+	jmp ebx ; set eip val to higher-half
+
+	higher_half: ; eip is in higher half!
+	call paging_enable
+	retn

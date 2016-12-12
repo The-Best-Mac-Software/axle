@@ -230,6 +230,7 @@ void startx_command() {
 	printf_info("Press 'q' to exit");
 	sleep(500);
 
+	/*
 	//switch into VGA for boot screen
 	Screen* vga_screen = switch_to_vga();
 
@@ -237,6 +238,7 @@ void startx_command() {
 	vga_boot_screen(vga_screen);
 	gfx_teardown(vga_screen);
 	switch_to_text();
+	*/
 
 	//actually launch xserv
 	xserv_init();

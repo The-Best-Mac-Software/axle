@@ -147,11 +147,13 @@ void pci_traverse_buses(void) {
 				if (vendor == 0xFFFF) continue;
 
 				uint16_t device_id = pci_device_id(bus, slot, func);
+				/*
 				pci_device* device = (pci_device*)kmalloc(sizeof(pci_device));
 				device->vendor = vendor;
 				device->device = device_id;
 				device->func = func;
 				array_m_insert(devices, device);
+				*/
 			}
 		}
 	}

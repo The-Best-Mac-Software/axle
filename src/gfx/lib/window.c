@@ -142,7 +142,7 @@ static void kill_window_real(Window* window) {
 		teardown(window, NULL);
 	}
 
-	//window_teardown(window);
+	window_teardown(window);
 }
 
 void kill_window(Window* window) {

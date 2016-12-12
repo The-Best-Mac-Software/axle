@@ -29,7 +29,7 @@ void xserv_quit(Screen* screen) {
 void draw_bmp(ca_layer* dest, Bmp* bmp) {
 	if (!bmp) return;
 
-	blit_layer(dest, bmp->layer, bmp->frame); 
+	blit_layer(dest, bmp->layer, bmp->frame, rect_make(point_zero(), bmp->frame.size)); 
 
 	bmp->needs_redraw = 0;
 }
@@ -69,7 +69,7 @@ void draw_label(ca_layer* dest, Label* label) {
 		idx++;
 	}
 
-	blit_layer(dest, label->layer, label->frame);
+	blit_layer(dest, label->layer, rect_make(label->frame.origin, dest->size), rect_make(point_zero(), label->frame.size));
 
 	label->needs_redraw = 0;
 }
@@ -127,13 +127,16 @@ void draw_view(View* view) {
 	for (int i = 0; i < view->subviews->size; i++) {
 		View* subview = (View*)array_m_lookup(view->subviews, i);
 		draw_view(subview);
-		blit_layer(view->layer, subview->layer, subview->frame);
+		blit_layer(view->layer, subview->layer, rect_make(subview->frame.origin, view->layer->size), rect_make(point_zero(), subview->frame.size));
 	}
 	view->needs_redraw = 0;
 }
 
 bool draw_window(Screen* UNUSED(screen), Window* window) {
 	if (!window->needs_redraw) return false;
+
+	//if window is invisible, don't bother drawing
+	if (!window->layer->alpha) return;
 
 	dirtied = 1;
 
@@ -146,14 +149,14 @@ bool draw_window(Screen* UNUSED(screen), Window* window) {
 		Label* title_label = (Label*)array_m_lookup(window->title_view->labels, 0);
 		title_label->text = window->title;
 		draw_view(window->title_view);
-		blit_layer(window->layer, window->title_view->layer, window->title_view->frame);
+		blit_layer(window->layer, window->title_view->layer, rect_make(point_zero(), window->layer->size), window->title_view->frame);
 		draw_rect(window->layer, window->title_view->frame, color_gray(), 2);
 	}
 
 	//only draw the content view if content_view exists
 	if (window->content_view) {
 		draw_view(window->content_view);
-		blit_layer(window->layer, window->content_view->layer, window->content_view->frame);
+		blit_layer(window->layer, window->content_view->layer, rect_make(window->content_view->frame.origin, window->layer->size), rect_make(point_zero(), window->content_view->frame.size));
 
 		//draw dividing border between window border and other content
 		if (window->border_width) {
@@ -226,10 +229,11 @@ void add_status_bar(Screen* screen) {
 void draw_desktop(Screen* screen) {
 	//paint root desktop
 	draw_window(screen, screen->window);
-	blit_layer(screen->vmem, screen->window->layer, screen->window->frame);
+	blit_layer(screen->vmem, screen->window->layer, screen->window->frame, screen->window->frame);
 
 	if (screen->window->subviews->size) {
 		Window* highest = array_m_lookup(screen->window->subviews, screen->window->subviews->size - 1);
+
 		//find clipping intersections with every window below the highest one
 		//redraw every child window at the same time if necessary
 		for (int i = 0; i < screen->window->subviews->size - 1; i++) {
@@ -240,7 +244,7 @@ void draw_desktop(Screen* screen) {
 			if (!visible_rects || highest->layer->alpha < 1.0) {
 				//not occluded by highest at all
 				//draw view normally, composite onto vmem
-				blit_layer(screen->vmem, win->layer, win->frame);
+				blit_layer(screen->vmem, win->layer, win->frame, rect_make(point_zero(), win->frame.size));
 			}
 			else {
 				//maximum 4 sub-rects
@@ -248,13 +252,17 @@ void draw_desktop(Screen* screen) {
 					Rect r = visible_rects[j];
 					if (r.size.width == 0 && r.size.height == 0) break;
 
-					blit_layer(screen->vmem, win->layer, r);
+					Coordinate origin_offset;
+					origin_offset.x = abs(win->frame.origin.x - r.origin.x);
+					origin_offset.y = abs(win->frame.origin.y - r.origin.y);
+					blit_layer(screen->vmem, win->layer, r, rect_make(origin_offset, r.size));
 				}
 			}
 		}
+
 		//finally, composite highest window
 		draw_window(screen, highest);
-		blit_layer(screen->vmem, highest->layer, highest->frame);
+		blit_layer(screen->vmem, highest->layer, highest->frame, rect_make(point_zero(), highest->layer->size));
 	}
 }
 

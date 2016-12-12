@@ -13,8 +13,9 @@ __BEGIN_DECLS
 //else return zero
 typedef int8_t (*lessthan_predicate_t)(type_t, type_t);
 typedef struct {
-	array_m* array;
-	uint16_t size;
+	type_t* array;
+	uint32_t size;
+	uint32_t max_size;
 	lessthan_predicate_t less_than;
 } array_o;
 

@@ -39,7 +39,7 @@ char kgetch() {
 }
 
 char getchar() {
-	sys_yield(KB_WAIT);
+	//sys_yield(KB_WAIT);
 	return kgetch();
 }
 
@@ -69,7 +69,7 @@ void kb_callback(registers_t regs) {
 
 		//inform OS
 		//clear released bit
-		kbman_process_release(scancode ^ 0x80);
+		//kbman_process_release(scancode ^ 0x80);
 	}
 	else {
 		//was this a control key?
@@ -102,7 +102,7 @@ void kb_callback(registers_t regs) {
 		}
 		
 		// if this key was a special key, inform os
-		kbman_process(scancode);
+		//kbman_process(scancode);
 	}
 }
 #pragma GCC diagnostic pop

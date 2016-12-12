@@ -16,5 +16,7 @@
 #include "panic.h"
 #include "timer.h"
 #include "printf.h"
+#include "unlikely.h"
+#include "math.h"
 
 #endif // STD_H

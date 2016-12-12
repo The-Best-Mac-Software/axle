@@ -46,8 +46,8 @@ void rexle() {
 
 void rexle_int() {
 	//switch graphics modes
-	Screen* screen = switch_to_vesa(0x112, true);
-	//Screen* screen = switch_to_vga();
+	//Screen* screen = switch_to_vesa(0x112, true);
+	Screen* screen = switch_to_vga();
 	Size screen_size = screen->window->frame.size;
 	
 	become_first_responder();

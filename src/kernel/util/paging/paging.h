@@ -49,9 +49,9 @@ page_t* get_page(uint32_t address, int make, page_directory_t* dir);
 page_directory_t* get_cr3();
 
 //maps physical range to virtual memory
-void vmem_map(uint32_t virt, uint32_t physical);
+void vmem_map(uint32_t virt, uint32_t physical, page_directory_t* dir);
 
-void alloc_frame(page_t* page, int is_kernel, int is_writeable);
+int alloc_frame(page_t* page, int is_kernel, int is_writeable);
 void free_frame(page_t* page);
 
 //create a new page directory with all the info of src
@@ -59,5 +59,8 @@ void free_frame(page_t* page);
 page_directory_t* clone_directory(page_directory_t* src);
 //free all memory associated with a page directory dir
 void free_directory(page_directory_t* dir);
+
+//returns physical address that virtual address addr is mapped to
+uint32_t vmm_get_mapping(uint32_t addr);
 
 #endif

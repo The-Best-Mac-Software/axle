@@ -5,8 +5,8 @@
 
 void halt_execution() {
 	//kill this task
-	printf_info("PID %d encountered unrecoverable fault, killing...", getpid());
-	_kill();
+	//printf_info("PID %d encountered unrecoverable fault, killing...", getpid());
+	//_kill();
 }
 
 void print_regs(registers_t regs) {

@@ -16,7 +16,7 @@ extern void handle_tick(uint32_t tick);
 static void tick_callback(registers_t regs) {
 	tick++;
 
-	handle_tick(tick);
+	//handle_tick(tick);
 }
 #pragma GCC diagnostic pop
 

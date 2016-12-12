@@ -18,7 +18,7 @@ CFLAGS = -g -ffreestanding -std=gnu99 -Wall -Wextra -I ./src
 LDFLAGS = -ffreestanding -nostdlib -lgcc -T $(RESOURCES)/linker.ld
 
 # Tools
-ISO_MAKER = $(TOOLCHAIN)/bin/grub-mkrescue --directory=$(TOOLCHAIN)/lib/grub/i386-pc
+ISO_MAKER = $(TOOLCHAIN)/bin/grub-mkrescue
 EMULATOR = qemu-system-i386
 FSGENERATOR = fsgen
 

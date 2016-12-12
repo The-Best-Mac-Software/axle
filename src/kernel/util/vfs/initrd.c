@@ -115,3 +115,9 @@ fs_node_t* initrd_install(uint32_t location) {
 
 	return initrd_root;
 }
+
+size_t ftell(FILE* fp) {
+	fs_node_t* node = fp->node;
+	initrd_file_header_t header = file_headers[node->inode];
+	return header.length;
+}

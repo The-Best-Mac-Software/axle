@@ -34,4 +34,6 @@
 #endif // __GNUC__
 #endif // UNUSED
 
+#define KERN_VMA 0xC0000000
+
 #endif // STD_BASE_H

@@ -3,7 +3,8 @@
 
 #include <std/common.h>
 
-typedef struct color {
+typedef union color {
+	uint32_t raw;
 	uint8_t val[3];
 } Color;
 

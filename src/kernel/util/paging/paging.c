@@ -18,9 +18,12 @@ volatile uint32_t memsize = 0; //size of paging memory
 extern uint32_t placement_address;
 extern heap_t* kheap;
 
+extern uint32_t end;
+
 //macros used in bitset algorithms
-#define INDEX_FROM_BIT(a) (a/(8*4))
-#define OFFSET_FROM_BIT(a) (a%(8*4))
+#define BITS 8
+#define INDEX_FROM_BIT(a) (a / (BITS * sizeof(*frames)))
+#define OFFSET_FROM_BIT(a) (a % (BITS * sizeof(*frames)))
 
 uint32_t get_cr0() {
 	uint32_t cr0;
@@ -39,28 +42,16 @@ page_directory_t* get_cr3() {
 }
 
 void set_cr3(page_directory_t* dir) {
-	//uint32_t addr = (uint32_t)&dir->tables[0];
-	//asm volatile("movl %%eax, %%cr3" :: "a" (addr));
-	//asm volatile("mov %0, %%cr3" : : "r"(dir->physicalAddr));
-	asm volatile("mov %0, %%cr3":: "r"(dir->physicalAddr));
-	uint32_t cr0 = get_cr0();
-	cr0 |= 0x80000000; //enable paging
-	set_cr0(cr0);
+	printf("cr3 is %x\n", &dir->tablesPhysical);
+	asm volatile("mov %0, %%cr3":: "r"(&dir->tablesPhysical));
 }
 
 //static function to set a bit in frames bitset
 static void set_bit_frame(uint32_t frame_addr) {
-	//if (frame_addr < nframes * 4 * 0x400) {
-		uint32_t frame = frame_addr/0x1000;
-		uint32_t idx = INDEX_FROM_BIT(frame);
-		uint32_t off = OFFSET_FROM_BIT(frame);
-		frames[idx] |= (0x1 << off);
-		/*
-	}
-	else {
-		printf_err("couldn't set frame %x", frame_addr);
-	}
-	*/
+	uint32_t frame = frame_addr/0x1000;
+	uint32_t idx = INDEX_FROM_BIT(frame);
+	uint32_t off = OFFSET_FROM_BIT(frame);
+	frames[idx] |= (0x1 << off);
 }
 
 //static function to clear a bit in the frames bitset
@@ -72,15 +63,12 @@ static void clear_frame(uint32_t frame_addr) {
 }
 
 //static function to test if a bit is sset
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
 static uint32_t test_frame(uint32_t frame_addr) {
 	uint32_t frame = frame_addr/0x1000;
 	uint32_t idx = INDEX_FROM_BIT(frame);
 	uint32_t off = OFFSET_FROM_BIT(frame);
 	return (frames[idx] & (0x1 << off));
 }
-#pragma GCC diagnostic pop
 
 //static function to find the first free frame
 static int32_t first_frame() {
@@ -121,27 +109,33 @@ void virtual_map_pages(long addr, unsigned long size, uint32_t rw, uint32_t user
 	return;
 }
 
-void vmem_map(uint32_t virt, uint32_t physical) {
-	uint16_t id = virt >> 22;
-	for (int i = 0; i < 0x1000; i++) {
-		page_t* page = get_page(virt+ (i * 0x1000), 1, current_directory);
-		page->present = 1;
-		page->rw = 1;
-		page->user = 1;
-		page->frame = (virt+ (i * 0x1000)) / 0x1000;
+void vmem_map(uint32_t virt, uint32_t physical, page_directory_t* dir) {
+	printf_info("Mapping %x -> %x", virt, physical);
+	//turn address into an index
+	virt /= 0x1000;
+	//find page table containing this address
+	uint32_t table_idx = virt / 1024;
+
+	//if this page is already assigned
+	if (dir->tables[table_idx]) {
+		//we need to take this frame
+		//copy the current frame data into a free page
+		page_t* new = get_page(first_frame(), 1, dir);
+		memcpy(new, dir->tables[table_idx], 0x1000);
+		//dir->tables[table_idx]->frame = NULL;
 	}
-	printf_info("Mapping %x (%x) -> %x", virt, id, physical);
+
+	page_t* mapped = alloc_frame(get_page(physical, 1, dir), 0, 0);
 }
 
 //function to allocate a frame
-void alloc_frame(page_t* page, int is_kernel, int is_writeable) {
-	/*
-	if (page->frame != 0) {
-		//frame was already allocated, return early
-		printf_info("alloc_frame: page %x already alloced (frame %x)", &page, page->frame);
-		return;
+int alloc_frame(page_t* page, int is_kernel, int is_writeable) {
+	if (page->frame) {
+		//frame was already allocated!
+		printf_dbg("alloc_page(): %x already mapped to %x", page, page->frame);
+		return -1;
 	}
-	*/
+
 	int32_t idx = first_frame(); //index of first free frame
 	if (idx == -1) {
 		PANIC("No free frames!");
@@ -152,7 +146,8 @@ void alloc_frame(page_t* page, int is_kernel, int is_writeable) {
 	page->rw = is_writeable; //should page be writable?
 	page->user = !is_kernel; //should page be user mode?
 	page->frame = idx;
-	//printf_info("finished allocating frame %x", &page);
+
+	return 0;
 }
 
 //function to dealloc a frame
@@ -168,11 +163,16 @@ void free_frame(page_t* page) {
 
 #define VESA_WIDTH 1024
 #define VESA_HEIGHT 768
-void identity_map_lfb(uint32_t location) { uint32_t j = location;
+void identity_map_lfb(uint32_t location) { 
+
+	//VESA has 3 bytes/pixel
+	int bpp = 3;
+	int required_bytes = VESA_WIDTH * VESA_HEIGHT * bpp;
+	uint32_t j = location;
 	//TODO use screen object instead of these vals
-	while (j < location + (VESA_WIDTH * VESA_HEIGHT * 4)) {
+	while (j < location + required_bytes) {
 		//if frame is valid
-		if (j + location + (VESA_WIDTH * VESA_HEIGHT * 4) < memsize) {
+		if (j + location + required_bytes < memsize) {
 			set_bit_frame(j); //tell frame bitset this frame is in use
 		}
 		//get page
@@ -184,19 +184,33 @@ void identity_map_lfb(uint32_t location) { uint32_t j = location;
 		page->frame = j / 0x1000;
 		j += 0x1000;
 	}
+	//virtual_map_pages(location, required_bytes, 1, 1);
 }
 
 static void page_fault(registers_t regs);
 
 void set_paging_bit(bool enabled) {
-	kernel_begin_critical();
 	if (enabled) {
 		set_cr0(get_cr0() | 0x80000000);
 	}
 	else {
-		set_cr0(get_cr0() & 0x80000000);
+		set_cr0(get_cr0() & 0x7FFFFFFF);
 	}
-	kernel_end_critical();
+}
+
+static uint32_t* page_directory = 0;
+static uint32_t page_dir_loc = 0;
+static uint32_t* last_page = 0;
+
+void paging_map_virt_to_phys(uint32_t virt, uint32_t phys) {
+	uint16_t id = virt >> 22;
+	for (int i = 0; i < 1024; i++) {
+		last_page[i] = phys | 3;
+		phys += 0x1000;
+	}
+	page_directory[id] = ((uint32_t)last_page) | 3;
+	last_page = (uint32_t*)(((uint32_t)last_page) + 0x1000);
+	printf("mapping %x (%d) to %x\n", virt, id, phys);
 }
 
 void paging_install() {
@@ -204,33 +218,43 @@ void paging_install() {
 
 	//size of physical memory
 	//assume 32MB
-	uint32_t mem_end_page = 0x10000000;
+	uint32_t mem_end_page = 0x1000000;
 	//uint32_t mem_end_page = memory_size;
 	memsize = mem_end_page;
+
+	printf("1");
 
 	nframes = mem_end_page / 0x1000;
 	frames = (uint32_t*)kmalloc(INDEX_FROM_BIT(nframes));
 	memset(frames, 0, INDEX_FROM_BIT(nframes));
 
+	printf("2");
+
 	//make page directory
-	// uint32_t phys;
 	kernel_directory = (page_directory_t*)kmalloc_a(sizeof(page_directory_t));
 	memset(kernel_directory, 0, sizeof(page_directory_t));
 	kernel_directory->physicalAddr = (uint32_t)kernel_directory->tablesPhysical;
 
+	printf("3 dir %x\n", kernel_directory);
+
+	while (1) {}
+
 	//identity map VESA LFB
-	uint32_t vesa_mem_addr = 0xFD000000; //TODO replace with function
-	identity_map_lfb(vesa_mem_addr);
+	//uint32_t vesa_mem_addr = 0xFD000000; //TODO replace with function
+	//identity_map_lfb(vesa_mem_addr);
 
 	//map pages in kernel heap area
 	//we call get_page but not alloc_frame
 	//this causes page_table_t's to be created where necessary
 	//don't alloc the frames yet, they need to be identity
 	//mapped below first.
+	/*
     unsigned int i = 0;
 	for (i = KHEAP_START; i < KHEAP_START + KHEAP_INITIAL_SIZE; i += 0x1000) {
 		get_page(i, 1, kernel_directory);
 	}
+	printf("4");
+	*/
 
 	//we need to identity map (phys addr = virtual addr) from
 	//0x0 to end of used memory, so we can access this
@@ -238,34 +262,55 @@ void paging_install() {
 	//note, inside this loop body we actually change placement_address
 	//by calling kmalloc(). A while loop causes this to be computed
 	//on-the-fly instead of once at the start
+	uint32_t* kernel_base = 0xC0000000;
 	unsigned idx = 0;
-	while (idx < placement_address + 0x1000) {
+	while (idx < 0x100000) {
+		vmem_map(kernel_base + idx, idx, kernel_directory);
 		//kernel code is readable but not writeable from userspace
-		alloc_frame(get_page(idx, 1, kernel_directory), 0, 0);
+		//int get = alloc_frame(get_page(idx, 1, kernel_directory), 0, 0);
+		/*
+		if (get < 0) {
+			PANIC("Getting page at %x failed", idx);
+		}
+		*/
 		idx += 0x1000;
 	}
 
+	/*
 	//allocate pages we mapped earlier
 	for (i = KHEAP_START; i < KHEAP_START + KHEAP_INITIAL_SIZE; i += 0x1000) {
 		alloc_frame(get_page(i, 1, kernel_directory), 0, 0);
 	}
+	*/
+	
 	printf_info("finished identity mapping kernel pages");
 
 	//before we enable paging, register page fault handler
 	register_interrupt_handler(14, page_fault);
 
 	//enable paging
+	printf("loading %x into cr3", kernel_directory);
+
+	enter_higher_half();
+
+}
+
+void paging_enable() {
 	switch_page_directory(kernel_directory);
 	//turn on paging
 	set_paging_bit(true);
+	while (1) {}
 
-
+	printf("attempting heap..\n");
 	//initialize kernel heap
-	kheap = create_heap(KHEAP_START, KHEAP_START + KHEAP_INITIAL_SIZE, KHEAP_MAX_ADDRESS, 0, 0);
-	expand(0x1000000, kheap);
+	//kheap = create_heap(KHEAP_START, KHEAP_START + KHEAP_INITIAL_SIZE, KHEAP_MAX_ADDRESS, 0, 0); 
+	//kheap = create_heap(KHEAP_START, KHEAP_START + KHEAP_INITIAL_SIZE, 0xCFFFF000, 0, 0); 
+	printf("made heap\n");
+	//expand(0x1000000, kheap);
 
-	current_directory = clone_directory(kernel_directory);
-	switch_page_directory(current_directory);
+	//current_directory = clone_directory(kernel_directory);
+	//current_directory = kernel_directory;
+	//switch_page_directory(current_directory);
 }
 
 void switch_page_directory(page_directory_t* dir) {
@@ -325,30 +370,18 @@ static void page_fault(registers_t regs) {
 	if (id) printf_err("Faulted during instruction fetch");
 
 	if (regs.eip != faulting_address) {
-		printf_err("Page fault caused by executing unpaged memory");
+		printf_err("Executed unpaged memory");
 	}
 	else {
-		printf_err("Page fault caused by reading unpaged memory");
+		printf_err("Read unpaged memory");
 	}
+	
+	//if accessing a non-mapped page, map it
+	if (!present) {
+		printf_info("Attempting page fault recovery...");
+		alloc_frame(get_page(faulting_address, true, kernel_directory), us, rw);
 
-	//if this page was present, attempt to recover by allocating the page
-	if (present) {
-		printf_info("attempting page fault recovery...");
-		//upper 10 bits of faulting addr has pde
-		unsigned table_mask = (1 << 10) - 1;
-		page_table_t* table = (page_table_t*)(faulting_address & table_mask);
-		printf_info("Addr of table: %x", &table);
-
-		//middle 10 bits has pte
-		unsigned page_mask = ((1 << 10) - 1) << 10;
-		page_t* page = (page_t*)(faulting_address & page_mask);
-		printf_info("page addr %x", &page);
-		printf_info("page frame: %x", page->frame);
-		alloc_frame(get_page((uint32_t)&page, present, kernel_directory), 0, rw);
-
-		asm volatile("xchgw %bx, %bx");
-
-		//return;
+		return;
 	}
 
 	extern void common_halt(registers_t regs, bool recoverable);
@@ -430,3 +463,13 @@ void free_directory(page_directory_t* dir) {
 	//finally, free directory
 	kfree(dir);
 }
+
+uint32_t vmm_get_mapping(uint32_t addr) {
+	page_t* page = get_page((uint32_t)addr, 0, current_directory);
+	if (!page || !page->frame) {
+		return NULL;
+	}
+	uint32_t phys = page->frame * 0x1000 + ((uint32_t)addr & 0xFFF);
+	return phys;
+}
+
